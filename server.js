@@ -10,7 +10,7 @@ app.use(express.json());
 
 function postMVD(series, number) {
   return new Promise((resolve, reject) => {
-    const postData = `SERJA=${series}&NOMER=${number}&requestType=0&form=RFPassportVerifyForm&uuid=`;
+    const postData = "SERJA=" + series + "&NOMER=" + number + "&requestType=0&form=RFPassportVerifyForm&uuid=";
 
     const options = {
       hostname: "xn--b1agjhrfhd.xn--b1ab2a0a.xn--b1aew.xn--p1ai",
@@ -44,8 +44,8 @@ function postMVD(series, number) {
 app.get("/check-passport", async (req, res) => {
   const { series, number } = req.query;
 
-  if (!series || !number) return res.status(400).json({ error: "Укажите series и number" });
-  if (!/^\d{4}$/.test(series) || !/^\d{6}$/.test(number)) return res.status(400).json({ error: "Серия — 4 цифры, номер — 6 цифр" });
+  if (!series || !number) return res.status(400).json({ error: "Ukajite series i number" });
+  if (!/^\d{4}$/.test(series) || !/^\d{6}$/.test(number)) return res.status(400).json({ error: "Seriya 4 cifry, nomer 6 cifr" });
 
   try {
     const html = await postMVD(series, number);
@@ -55,24 +55,24 @@ app.get("/check-passport", async (req, res) => {
 
     if (html.includes("действительный") || html.includes("Документ действителен") || html.includes("является действительным")) {
       valid = true;
-      message = "Паспорт действителен";
+      message = "действителен";
     } else if (html.includes("недействительный") || html.includes("не действителен") || html.includes("Документ недействителен") || html.includes("является недействительным")) {
       valid = false;
-      message = "Паспорт недействителен";
+      message = "недействителен";
     } else if (html.includes("не найден") || html.includes("не числится")) {
       valid = false;
-      message = "Паспорт не найден в базе";
+      message = "не найден в базе";
     } else {
-      message = "Не удалось определить статус";
+      message = "статус не определен";
     }
 
     return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html.slice(0, 2000) });
 
   } catch (err) {
-    return res.status(500).json({ error: "Ошибка соединения с МВД", details: err.message });
+    return res.status(500).json({ error: "error", details: err.message });
   }
 });
 
-app.get("/", (req, res) => res.json({ status: "ok", service: "passport-proxy" }));
+app.get("/", (req, res) => res.json({ status: "ok" }));
 
-app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`)); это мероприятие где-то собираются или
+app.listen(PORT, function() { console.log("Server started on port " + PORT); });
