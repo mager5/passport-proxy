@@ -8,17 +8,19 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-function fetchMVD(series, number) {
+function fetchMVD(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
+    if (redirectCount > 5) return reject(new Error("Слишком много редиректов"));
+
+    const urlObj = new URL(url);
     const options = {
-      hostname: "xn--b1ab2a0a.xn--b1aew.xn--p1ai",
-      path: `/info-service.htm?sid=2000&form=RFPassportVerifyForm&uuid=&requestType=0&SERJA=${series}&NOMER=${number}`,
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
       method: "GET",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Referer": "https://xn--b1ab2a0a.xn--b1aew.xn--p1ai/info-service.htm?sid=2000",
       },
@@ -26,6 +28,14 @@ function fetchMVD(series, number) {
     };
 
     const req = https.request(options, (res) => {
+      // Следуем редиректу
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303) {
+        const location = res.headers["location"];
+        if (!location) return reject(new Error("Редирект без Location"));
+        const nextUrl = location.startsWith("http") ? location : "https://" + urlObj.hostname + location;
+        return resolve(fetchMVD(nextUrl, redirectCount + 1));
+      }
+
       let data = [];
       res.on("data", chunk => data.push(chunk));
       res.on("end", () => resolve(Buffer.concat(data).toString("utf8")));
@@ -44,7 +54,8 @@ app.get("/check-passport", async (req, res) => {
   if (!/^\d{4}$/.test(series) || !/^\d{6}$/.test(number)) return res.status(400).json({ error: "Серия — 4 цифры, номер — 6 цифр" });
 
   try {
-    const html = await fetchMVD(series, number);
+    const url = `https://xn--b1ab2a0a.xn--b1aew.xn--p1ai/info-service.htm?sid=2000&form=RFPassportVerifyForm&uuid=&requestType=0&SERJA=${series}&NOMER=${number}`;
+    const html = await fetchMVD(url);
 
     let valid = null;
     let message = "";
@@ -60,13 +71,11 @@ app.get("/check-passport", async (req, res) => {
       message = "Паспорт не найден в базе";
     } else {
       message = "Не удалось определить статус";
-      console.log("HTML от МВД:", html.slice(0, 800));
     }
 
-    return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html });
+    return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html.slice(0, 1000) });
 
   } catch (err) {
-    console.error("Ошибка:", err.message);
     return res.status(500).json({ error: "Ошибка соединения с МВД", details: err.message });
   }
 });
