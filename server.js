@@ -8,34 +8,27 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-function fetchMVD(url, redirectCount = 0) {
+function postMVD(series, number) {
   return new Promise((resolve, reject) => {
-    if (redirectCount > 5) return reject(new Error("Слишком много редиректов"));
+    const postData = `SERJA=${series}&NOMER=${number}&requestType=0&form=RFPassportVerifyForm&uuid=`;
 
-    const urlObj = new URL(url);
     const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: "GET",
+      hostname: "xn--b1agjhrfhd.xn--b1ab2a0a.xn--b1aew.xn--p1ai",
+      path: "/info-service.htm",
+      method: "POST",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(postData),
+        "Referer": "https://xn--b1agjhrfhd.xn--b1ab2a0a.xn--b1aew.xn--p1ai/info-service.htm",
         "Connection": "keep-alive",
-        "Referer": "https://xn--b1ab2a0a.xn--b1aew.xn--p1ai/info-service.htm?sid=2000",
       },
       timeout: 15000,
     };
 
     const req = https.request(options, (res) => {
-      // Следуем редиректу
-      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303) {
-        const location = res.headers["location"];
-        if (!location) return reject(new Error("Редирект без Location"));
-        const nextUrl = location.startsWith("http") ? location : "https://" + urlObj.hostname + location;
-        return resolve(fetchMVD(nextUrl, redirectCount + 1));
-      }
-
       let data = [];
       res.on("data", chunk => data.push(chunk));
       res.on("end", () => resolve(Buffer.concat(data).toString("utf8")));
@@ -43,6 +36,7 @@ function fetchMVD(url, redirectCount = 0) {
 
     req.on("error", reject);
     req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.write(postData);
     req.end();
   });
 }
@@ -54,8 +48,7 @@ app.get("/check-passport", async (req, res) => {
   if (!/^\d{4}$/.test(series) || !/^\d{6}$/.test(number)) return res.status(400).json({ error: "Серия — 4 цифры, номер — 6 цифр" });
 
   try {
-    const url = `https://xn--b1ab2a0a.xn--b1aew.xn--p1ai/info-service.htm?sid=2000&form=RFPassportVerifyForm&uuid=&requestType=0&SERJA=${series}&NOMER=${number}`;
-    const html = await fetchMVD(url);
+    const html = await postMVD(series, number);
 
     let valid = null;
     let message = "";
@@ -73,7 +66,7 @@ app.get("/check-passport", async (req, res) => {
       message = "Не удалось определить статус";
     }
 
-    return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html.slice(0, 1000) });
+    return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html.slice(0, 2000) });
 
   } catch (err) {
     return res.status(500).json({ error: "Ошибка соединения с МВД", details: err.message });
@@ -82,4 +75,4 @@ app.get("/check-passport", async (req, res) => {
 
 app.get("/", (req, res) => res.json({ status: "ok", service: "passport-proxy" }));
 
-app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`)); это мероприятие где-то собираются или
