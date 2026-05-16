@@ -63,7 +63,7 @@ app.get("/check-passport", async (req, res) => {
       console.log("HTML от МВД:", html.slice(0, 800));
     }
 
-    return res.json({ valid, message, series, number, htmlLength: html.length });
+    return res.json({ valid, message, series, number, htmlLength: html.length, htmlRaw: html });
 
   } catch (err) {
     console.error("Ошибка:", err.message);
